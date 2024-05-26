@@ -1,0 +1,63 @@
+use hidapi::HidApi;
+use std::thread;
+use std::time::Duration;
+
+// Find the Lovense device
+let api = HidApi::new().unwrap();
+let device_info = api
+    .device_list()
+    .filter(|info| info.vendor_id() == 0x1915 && info.product_id() == 0x520C)
+    .next()
+    .expect("Lovense device not found.");
+
+let device = device_info.open_device(&api).unwrap();
+
+// Send commands to the Lovense device
+fn send_command(device: &hidapi::HidDevice, command: &[u8]) {
+    device.write(command).unwrap();
+}
+
+// Example: Start vibration with intensity level 5
+fn start_vibration(device: &hidapi::HidDevice, intensity: u8) {
+    let command = format!("Vibrate:{}\r\n", intensity);
+    send_command(device, command.as_bytes());
+}
+
+// Example: Stop vibration
+fn stop_vibration(device: &hidapi::HidDevice) {
+    send_command(device, b"Vibrate:0\r\n");
+}
+
+// Example: Change thrusting speed
+fn change_thrusting_speed(device: &hidapi::HidDevice, speed: u8) {
+    let command = format!("ChangeSpeed:{}\r\n", speed);
+    send_command(device, command.as_bytes());
+}
+
+// Example: Connect to Lovense app and control the device
+fn control_with_app(device_address: &str) {
+    // Connect to the Lovense app through Bluetooth
+    // Example: Establish Bluetooth connection with the Lovense app
+    let socket = bluetooth::connect(device_address).unwrap();
+
+    // Send commands to control the device through the app
+    // Example: Start vibration
+    socket.send(b"Vibrate:1\r\n").unwrap();
+    // Example: Change vibration intensity
+    socket.send(b"Vibrate:5\r\n").unwrap();
+    // Example: Stop vibration
+    socket.send(b"Vibrate:0\r\n").unwrap();
+    // Example: Change thrusting speed
+    socket.send(b"ChangeSpeed:2\r\n").unwrap();
+
+    // Close the Bluetooth connection
+    socket.close().unwrap();
+}
+
+// Example: Control the Lovense device directly
+start_vibration(&device, 5);
+change_thrusting_speed(&device, 2);
+stop_vibration(&device);
+
+// Example: Control the Lovense device through the app
+control_with_app("00:00:00:00:00:00"); // Replace with the actual device address
