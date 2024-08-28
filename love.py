@@ -2,63 +2,63 @@ import usb.core
 import usb.util
 import bluetooth
 
-# Find the Lovense device
-dev = usb.core.find(idVendor=0x1915, idProduct=0x520C)
+class LovenseAPI:
+    def __init__(self, usb_vendor_id=0x1915, usb_product_id=0x520C):
+        self.device = usb.core.find(idVendor=usb_vendor_id, idProduct=usb_product_id)
+        if self.device is None:
+            raise ValueError("Lovense device not found.")
+        
+        if self.device.is_kernel_driver_active(0):
+            self.device.detach_kernel_driver(0)
 
-if dev is None:
-    raise ValueError("Lovense device not found.")
+        usb.util.claim_interface(self.device, 0)
 
-# Detach and claim the device interface
-if dev.is_kernel_driver_active(0):
-    dev.detach_kernel_driver(0)
+    def send_command(self, command):
+        """Send a command to the Lovense device over USB."""
+        endpoint_out = self.device[0][(0, 0)][0]
+        self.device.write(endpoint_out.bEndpointAddress, command)
 
-usb.util.claim_interface(dev, 0)
+    def start_vibration(self, intensity):
+        """Start the vibration with a given intensity level (1-10)."""
+        command = f'\x01Vibrate:{intensity}\r\n'.encode()
+        self.send_command(command)
 
-# Send commands to the Lovense device
-def send_command(command):
-    endpoint_out = dev[0][(0, 0)][0]
-    dev.write(endpoint_out.bEndpointAddress, command)
+    def stop_vibration(self):
+        """Stop the vibration."""
+        command = b'\x01Vibrate:0\r\n'
+        self.send_command(command)
 
-# Establish Bluetooth connection with Lovense app
-def connect_to_app(device_address):
-    socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-    socket.connect((device_address, 1))
-    return socket
+    def change_thrusting_speed(self, speed):
+        """Change the thrusting speed (1-10)."""
+        command = f'\x01ChangeSpeed:{speed}\r\n'.encode()
+        self.send_command(command)
 
-# Example: Start vibration with intensity level 5
-def start_vibration(intensity):
-    command = f'\x01Vibrate:{intensity}\r\n'.encode()
-    send_command(command)
+    def connect_to_app(self, device_address):
+        """Establish a Bluetooth connection with the Lovense app."""
+        socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+        socket.connect((device_address, 1))
+        return socket
 
-# Example: Stop vibration
-def stop_vibration():
-    command = b'\x01Vibrate:0\r\n'
-    send_command(command)
+    def control_with_app(self, device_address):
+        """Control the Lovense device via the Lovense app over Bluetooth."""
+        socket = self.connect_to_app(device_address)
+        
+        # Send commands to the device via the app
+        socket.send(b'Vibrate:1\r\n')
+        socket.send(b'Vibrate:5\r\n')
+        socket.send(b'Vibrate:0\r\n')
+        socket.send(b'ChangeSpeed:2\r\n')
+        
+        socket.close()
 
-# Example: Change thrusting speed
-def change_thrusting_speed(speed):
-    command = f'\x01ChangeSpeed:{speed}\r\n'.encode()
-    send_command(command)
+# Example usage:
+if __name__ == "__main__":
+    lovense = LovenseAPI()
 
-# Example: Connect to Lovense app and control the device
-def control_with_app(device_address):
-    socket = connect_to_app(device_address)
-    # Send commands to control the device through the app
-    # Example: Start vibration
-    socket.send(b'Vibrate:1\r\n')
-    # Example: Change vibration intensity
-    socket.send(b'Vibrate:5\r\n')
-    # Example: Stop vibration
-    socket.send(b'Vibrate:0\r\n')
-    # Example: Change thrusting speed
-    socket.send(b'ChangeSpeed:2\r\n')
-    # Close the Bluetooth connection
-    socket.close()
+    # Control the Lovense device directly
+    lovense.start_vibration(5)
+    lovense.change_thrusting_speed(2)
+    lovense.stop_vibration()
 
-# Example: Control the Lovense device directly
-start_vibration(5)
-change_thrusting_speed(2)
-stop_vibration()
-
-# Example: Control the Lovense device through the app
-control_with_app('00:00:00:00:00:00')  # Replace with the actual device address
+    # Control the Lovense device through the app
+    lovense.control_with_app('00:00:00:00:00:00')  # Replace with the actual Bluetooth address
